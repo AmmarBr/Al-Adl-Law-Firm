@@ -1,17 +1,19 @@
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 
-async function getPosts() {
-    const res = await fetch('http://localhost:3000/api/posts', {
-        next: { tags: ['posts'] },
-        cache: 'no-store'
-    });
+import dbConnect from '@/lib/db';
+import BlogPost from '@/models/BlogPost';
 
-    if (!res.ok) return [];
-    const json = await res.json();
-    const allPosts = json.data || [];
-    // Filter for published only in public view
-    return allPosts.filter((p: any) => p.isPublished);
+async function getPosts() {
+    await dbConnect();
+    // Directly query the database for published posts
+    // Lean queries are faster and return POJOs
+    const posts = await BlogPost.find({ isPublished: true }).sort({ createdAt: -1 }).lean();
+
+    // Convert _id and other non-serializable fields if necessary, 
+    // though .lean() helps. Next.js server components can handle simple objects.
+    // We map to ensure clean data passage.
+    return JSON.parse(JSON.stringify(posts));
 }
 
 export default async function BlogPage({ params }: { params: Promise<{ locale: string }> }) {
